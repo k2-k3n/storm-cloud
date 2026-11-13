@@ -1,0 +1,26 @@
+{
+  "controllerVersion": "1.1.0",
+  "enabled": true,
+  "entries": {
+    "mobile": "mobile/index.html",
+    "web": "web/index.html"
+  },
+  "entry": "mobile/index.html",
+  "format": "clcontrol",
+  "id": "org.resona.creative.storm-cloud.controller",
+  "interfaces": [
+    "web",
+    "mobile"
+  ],
+  "name": "Storm Cloud",
+  "permissions": [
+    "midi"
+  ],
+  "target": {
+    "appId": "org.resona.creative.storm-cloud",
+    "appName": "Storm Cloud",
+    "appVersion": "1.1.0",
+    "protocolVersion": 1
+  },
+  "version": 1
+}

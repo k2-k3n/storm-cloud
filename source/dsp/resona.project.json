@@ -1,0 +1,12 @@
+{
+  "name": "Storm Voice",
+  "id": "org.resona.creative.storm-cloud.voice",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Rain, wind and thunder that follow your picking dynamics, with a dark outdoor reverb around the guitar.",
+  "sources": [
+    "src/dsp.cpp",
+    "src/ui.cpp",
+    "src/main.cpp"
+  ]
+}

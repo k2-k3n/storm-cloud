@@ -1,0 +1,31 @@
+{
+  "folder": "05-Storm-Cloud",
+  "description": "演奏动态驱动雨、风、雷和空间混响。",
+  "app": {
+    "file": "App.rpk",
+    "id": "org.resona.creative.storm-cloud",
+    "name": "Storm Cloud",
+    "version": "1.1.2",
+    "kind": 1,
+    "bytes": 282524,
+    "sha256": "8c6572a49107359f41fc8cae8b270eebab19dfbbf8543468e7aa64e745c24547",
+    "crc32": 2281555551
+  },
+  "audio_packs": [
+    {
+      "file": "Audio-Pack.rpk",
+      "id": "org.resona.creative.storm-cloud.voice",
+      "name": "Storm Voice",
+      "version": "1.0.0",
+      "kind": 0,
+      "bytes": 21684,
+      "sha256": "1ec4a00fc4724faa3342a472757ac5f8ef56e3e457440d82afc7e804f55ba6da",
+      "crc32": 2121083713
+    }
+  ],
+  "source": "source/",
+  "cover": "界面.png",
+  "license_file_present": false,
+  "host_build_check": "updated build verified",
+  "community_upload": "not sent"
+}
