@@ -1,6 +1,6 @@
 {
   "description": "用拨弦力度带动雨、风和雷，再把它们和吉他放进同一个混响空间。",
-  "readme": "# Storm Voice\n\n用拨弦力度带动雨、风和雷，再把它们和吉他放进同一个混响空间。\n\n## 使用方法\n\n1. 先在 Resona Box 上安装本音频包。\n2. 安装并打开 Storm Cloud 1.1.2。\n3. 在 App 界面使用上方和下方编码器控制音色与功能。\n\n## 配套关系\n\n- 音频包：`org.resona.creative.storm-cloud.voice`，版本 1.0.0\n- App：`org.resona.creative.storm-cloud`，版本 1.1.0\n\n完整界面及双编码器的旋转、短按、长按说明见 Storm Cloud 的社区项目页面。\n",
+  "readme": "# Storm Voice\n\n用拨弦力度带动雨、风和雷，再把它们和吉他放进同一个混响空间。\n\n## 使用方法\n\n1. 先在 Resona Box 上安装本音频包。\n2. 安装并打开 Storm Cloud 1.1.5。\n3. 在 App 界面使用上方和下方编码器控制音色与功能。\n\n## 配套关系\n\n- 音频包：`org.resona.creative.storm-cloud.voice`，版本 1.0.0\n- App：`org.resona.creative.storm-cloud`，版本 1.1.5\n\n完整界面及双编码器的旋转、短按、长按说明见 Storm Cloud 的社区项目页面。\n",
   "release_notes": "",
   "source_url": "https://github.com/k2-k3n/storm-cloud/tree/main/source/dsp",
   "category": ""

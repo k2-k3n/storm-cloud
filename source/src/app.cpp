@@ -7,8 +7,7 @@
 // The sound is the nested dsp/ pack (Storm Voice); this file is the sky. The App cannot read the
 // pack's state, so the weather follows the input meter: play softly and it drizzles, dig in and
 // the cloud turns black, a hard pick is lightning, and nine quiet seconds bring the sun back out
-// with a rainbow. The artwork is baked pixel art (art.h, from ../_art/storm_art.py) with two
-// palettes, calm and storm; fading between them is the whole change of weather.
+// with a rainbow. The valley and cloud are baked by tools/encode_weather.py.
 //
 // The Web, Mobile and MIDI controllers (controller/, CCs on channel 1, see README.md) reach every
 // setting the knobs reach, plus the thunder's loudness, MIX and LEVEL, and four hold pads:
@@ -19,6 +18,7 @@
 #include "splash_data.h"
 #include "kit.h"
 #include "art.h"
+#include "weather.h"
 #include "controller_link.h"
 
 namespace {
@@ -120,7 +120,8 @@ void blit_dither(kit::Canvas &c, const kit::Sprite &sp, const uint16_t *pal, int
         const uint8_t *row = sp.px + (uint32_t)j * sp.w;
         for (int i = 0; i < sp.w; ++i) {
             const int X = x + i;
-            if (row[i] && X >= 0 && X < kit::Canvas::W && kBayer[(Y & 3) * 4 + (X & 3)] < level) c.px[(uint32_t)Y * c.stride + (uint32_t)X] = pal[row[i]];
+            if (row[i] && X >= 0 && X < kit::Canvas::W && kBayer[(Y & 3) * 4 + (X & 3)] < level)
+                c.px[(uint32_t)Y * c.stride + (uint32_t)X] = pal[row[i]];
         }
     }
 }
@@ -155,18 +156,29 @@ void draw(State *st)
         st->pal_s[i] = kit::mix(kit::mix(kArtPalette[i], kArtStorm[i], dark), white, flash);
         st->pal_c[i] = kit::mix(kit::mix(kArtPalette[i], kArtStorm[i], dc), white, flash * 0.6f);
     }
-    st->pal_c[kArtFeature] = dc > 0.55f ? kArtStorm[kArtFeature] : kArtPalette[kArtFeature];   // ink on white, pale on black
     const uint16_t *ps = st->pal_s, *pc = st->pal_c;
 
-    // sky, mountains (SPACE), rainbow, sun
-    c.backdrop(kArt_sky, ps);
-    const float grow = kit::clampf((float)(ms - st->space_at) / 500.0f, 0.0f, 1.0f);
-    const int rise = st->space_at == kNever ? 0 : (int)((1.0f - grow) * (1.0f - grow) * 30.0f);
-    if (space >= 2) c.blit(kArt_mnt_huge, ps, 0, space == 2 ? rise : 0);
-    if (space >= 1) c.blit(kArt_mnt_wide, ps, 0, space == 1 ? rise : 0);
+    const float intro = kit::clampf((float)ms / 350.0f, 0.0f, 1.0f);
+    const float reveal = intro * intro * (3.0f - 2.0f * intro);
+    uint16_t valley[sizeof kValleyPalette / sizeof kValleyPalette[0]];
+    const uint16_t deep = kit::rgb(15, 24, 54);
+    const uint16_t mist = kit::rgb(174, 193, 225);
+    const float haze = space == 2 ? 0.48f : (space == 1 ? 0.22f : 0.0f);
+    for (unsigned i = 0; i < sizeof kValleyPalette / sizeof kValleyPalette[0]; ++i) {
+        const uint16_t original = kValleyPalette[i];
+        // Lift the valley without flattening the terrain or the cottage's warm light.
+        const uint16_t color = kit::rgb(((original >> 11) * 8) + 26,
+                                      (((original >> 5) & 63) * 4) + 29,
+                                      ((original & 31) * 8) + 32);
+        const int blue_bias = (original & 31) - (original >> 11);
+        const float distance = kit::clampf((blue_bias - 5) * 0.10f, 0.0f, 1.0f);
+        const uint16_t shaded = kit::mix(color, mist, haze * distance);
+        const uint16_t dusk = kit::mix(shaded, deep, dark * 0.08f);
+        valley[i] = kit::mix(dusk, white, flash * 0.38f);
+    }
+    c.backdrop(kValley, valley);
     if (bright > 9000u) blit_dither(c, kArt_rainbow, ps, 0, 0, kit::clampi((int)((bright - 9000u) / 90u), 0, 16));
     if (dark < 0.3f) c.blit((ms / 600u) & 1u ? kArt_sun_1 : kArt_sun_0, ps, kSunX - (int)(dark * 60.0f), kSunY + (int)(dark * 50.0f));   // it ducks behind the cloud
-    if (dark > 0.42f) c.blit(kArt_ceiling, pc, 0, -30 + (int)(30.0f * kit::clampf((dark - 0.42f) / 0.3f, 0.0f, 1.0f)));
 
     // the cloud
     const bool shocked = ts < 650u, fuming = !shocked && ts < 1600u;
@@ -176,7 +188,13 @@ void draw(State *st)
     const int bob = (int)(2.2f * resona_sinf((float)(ms % 5600u) * (6.2832f / 5600.0f)));
     const int shake = (fuming || (angry && dark > 0.85f)) ? (int)((ms / 60u) & 1u) * 2 - 1 : 0;
     const int cx = kCloudX + shake, cy = kCloudY + bob - (shocked && ts < 200u ? 3 : 0);
-    c.blit(shocked ? kArt_cloud_spiky : (blowing ? kArt_cloud_puffed : kArt_cloud_fluffy), pc, cx, cy);
+    uint16_t cloud[sizeof kCloudPalette / sizeof kCloudPalette[0]];
+    for (unsigned i = 0; i < sizeof kCloudPalette / sizeof kCloudPalette[0]; ++i) {
+        const uint16_t tone = kit::mix(kCloudPalette[i], deep, dc * 0.70f);
+        cloud[i] = kit::mix(tone, white, flash * 0.52f);
+    }
+    c.blit(kFeltCloud, cloud, cx, cy);
+    st->pal_c[kArtFeature] = cream;
     const int fx = cx, fy = cy + 4;
     const uint32_t since_blink = ms - st->blink_at;
     const kit::Sprite *eye = &kArt_eye_open, *mouth = &kArt_mouth_smile;
@@ -199,15 +217,22 @@ void draw(State *st)
     // THUNDER is on: the cloud keeps a bolt handy (it has just thrown it while lightning is out)
     if ((st->s.thunder || st->gust) && ts > 900u) c.blit(kArt_bolt_small, pc, cx + 52 + (int)((ms / 180u) & 1u), cy + 22 + (int)((ms / 420u) & 1u));
 
-    // lightning, flickering
-    if (ts < 90u || (ts >= 130u && ts < 300u)) c.blit(kArt_bolt, pc, st->strike_x, kCloudY + 28, st->strike_flip != 0);
+    // Draw a soft fringe and a sharp branching core over the valley.
+    if (ts < 90u || (ts >= 130u && ts < 300u)) {
+        const int x = kit::clampi(st->strike_x, 24, 290);
+        const int side = st->strike_flip ? -1 : 1;
+        const int y = cy + 25;
+        const uint16_t fringe = kit::rgb(106, 134, 213);
+        const uint16_t core = kit::rgb(214, 228, 255);
+        c.thick(x, y, x - 13 * side, y + 24, 3, fringe);
+        c.thick(x - 13 * side, y + 24, x + 2 * side, y + 20, 3, fringe);
+        c.thick(x + 2 * side, y + 20, x - 21 * side, y + 58, 3, fringe);
+        c.line(x, y, x - 13 * side, y + 24, core);
+        c.line(x - 13 * side, y + 24, x + 2 * side, y + 20, core);
+        c.line(x + 2 * side, y + 20, x - 21 * side, y + 58, core);
+        c.line(x - 5 * side, y + 32, x + 12 * side, y + 42, fringe);
+    }
 
-    // the land
-    c.blit(kArt_hill, ps, 0, 0);
-    static const kit::Sprite *const kTree[3] = {&kArt_tree_0, &kArt_tree_1, &kArt_tree_2};
-    const int gusty = windv > 0.12f ? (int)((ms / 330u) & 1u) : 0;
-    const int bend = windv < 0.12f ? 0 : (windv < 0.5f ? gusty : 1 + gusty);
-    c.blit(*kTree[bend], ps, kTreeX, kTreeY);
     static const kit::Sprite *const kGauge[6] = {&kArt_gauge_0, &kArt_gauge_1, &kArt_gauge_2, &kArt_gauge_3, &kArt_gauge_4, &kArt_gauge_5};
     c.blit(*kGauge[kit::clampi((rain + 19) / 20, 0, 5)], ps, kGaugeX, kGaugeY);
     static const kit::Sprite *const kSock[3][2] = {{&kArt_sock_0_0, &kArt_sock_0_1}, {&kArt_sock_1_0, &kArt_sock_1_1}, {&kArt_sock_2_0, &kArt_sock_2_1}};
@@ -274,7 +299,10 @@ void draw(State *st)
             if (y < ground + 4) { c.put(x - 2, ground - 1, drop_hi); c.put(x + 2, ground - 1, drop_hi); c.put(x, ground, drop_lo); }
             continue;
         }
-        for (int j = 0; j < 6; ++j) c.put(x - (int)((float)j * slant), y - j, j < 3 ? drop_hi : drop_lo);
+        const int length = 4 + (int)((h >> 20) % 7u);
+        const uint16_t trail = kit::mix(drop_lo, deep, wide ? 0.48f : 0.28f);
+        for (int j = 0; j < length; ++j)
+            c.put(x - (int)((float)j * slant), y - j, j < 2 ? drop_hi : (j < 5 ? drop_lo : trail));
     }
 
     // a knob's value shows for a moment after it is turned, by the thing it changes
@@ -286,6 +314,12 @@ void draw(State *st)
     }
 
     c.banner(kit::audio_message(st->audio, "INSTALL STORM VOICE IN LAB"), ink, kit::rgb(252, 236, 150));
+    if (intro < 1.0f) {
+        for (int y = 0; y < c.H; ++y) {
+            uint16_t *row = c.px + y * c.stride;
+            for (int x = 0; x < c.W; ++x) row[x] = kit::mix(0, row[x], reveal);
+        }
+    }
     c.present(P);
 }
 

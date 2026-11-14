@@ -1,9 +1,9 @@
 {
   "name": "Storm Cloud",
   "id": "org.resona.creative.storm-cloud",
-  "version": "1.1.2",
+  "version": "1.1.5",
   "api": 1,
-  "description": "Your playing is the weather: a cloud with a face rains, blows and throws lightning over a little pixel-art valley. Drives the nested Storm Voice pack.",
+  "description": "Your playing is the weather: a cloud with a face rains, blows and throws lightning over a little miniature valley. Drives the nested Storm Voice pack.",
   "kind": "app",
   "sources": [
     "src/app.cpp"
