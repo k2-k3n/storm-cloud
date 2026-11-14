@@ -5,11 +5,11 @@
     "file": "App.rpk",
     "id": "org.resona.creative.storm-cloud",
     "name": "Storm Cloud",
-    "version": "1.1.5",
+    "version": "1.1.6",
     "kind": 1,
-    "bytes": 154904,
-    "sha256": "16eceaad15e67b460ea79aefcb6d0f31cf6c1f1b695041e11f4a609d4d04fd67",
-    "crc32": 1423435119
+    "bytes": 155524,
+    "sha256": "274278a5c4f8afbc6ab7ada6e66f278c44d90e89ad2649af5a383ed392aeaa51",
+    "crc32": 373564158
   },
   "audio_packs": [
     {

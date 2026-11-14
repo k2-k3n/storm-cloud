@@ -1,7 +1,7 @@
 {
   "name": "Storm Cloud",
   "id": "org.resona.creative.storm-cloud",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "api": 1,
   "description": "Your playing is the weather: a cloud with a face rains, blows and throws lightning over a little miniature valley. Drives the nested Storm Voice pack.",
   "kind": "app",

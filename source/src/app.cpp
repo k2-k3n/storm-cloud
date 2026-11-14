@@ -44,7 +44,7 @@ struct State {
     kit::Levels lv;
     kit::Saver saver;
     Saved s;
-    uint32_t ms, idle, blink_at, seed;
+    uint32_t ms, idle, blink_at, next_blink, next_draw, seed;
     uint32_t rain_at, wind_at, space_at, strike_at, touched_at;   // when each was last touched (ms + kNever = never)
     int touched, strike_x, strike_flip, struck;
     float storm, dark, wet;      // how hard you play (smoothed), how black the sky is, how soaked the ground
@@ -147,13 +147,12 @@ void draw(State *st)
 
     // this frame's palettes: calm .. storm, and white for an instant when lightning strikes
     float flash = 0.0f;
-    if (ts < 70u) flash = 0.8f;
-    else if (ts >= 110u && ts < 180u) flash = 0.4f;
-    else if (ts >= 180u && ts < 420u) flash = 0.3f * (1.0f - (float)(ts - 180u) / 240.0f);
+    if (ts < 80u) flash = 0.64f * (1.0f - ts / 115.0f);
+    else if (ts >= 130u && ts < 310u) flash = 0.35f * (1.0f - (ts - 130u) / 180.0f);
     const float dc = kit::clampf(dark * 1.3f, 0.0f, 1.0f);
     const uint16_t white = kit::rgb(236, 240, 255);
     for (int i = 1; i < kArtColours; ++i) {
-        st->pal_s[i] = kit::mix(kit::mix(kArtPalette[i], kArtStorm[i], dark), white, flash);
+        st->pal_s[i] = kit::mix(kit::mix(kArtPalette[i], kArtStorm[i], dark), white, flash * .18f);
         st->pal_c[i] = kit::mix(kit::mix(kArtPalette[i], kArtStorm[i], dc), white, flash * 0.6f);
     }
     const uint16_t *ps = st->pal_s, *pc = st->pal_c;
@@ -161,20 +160,20 @@ void draw(State *st)
     const float intro = kit::clampf((float)ms / 350.0f, 0.0f, 1.0f);
     const float reveal = intro * intro * (3.0f - 2.0f * intro);
     uint16_t valley[sizeof kValleyPalette / sizeof kValleyPalette[0]];
-    const uint16_t deep = kit::rgb(15, 24, 54);
-    const uint16_t mist = kit::rgb(174, 193, 225);
-    const float haze = space == 2 ? 0.48f : (space == 1 ? 0.22f : 0.0f);
+    const uint16_t deep = kit::rgb(25, 42, 72);
+    const uint16_t mist = kit::rgb(161, 193, 219);
+    const float haze = space == 2 ? 0.31f : (space == 1 ? 0.13f : 0.0f);
     for (unsigned i = 0; i < sizeof kValleyPalette / sizeof kValleyPalette[0]; ++i) {
         const uint16_t original = kValleyPalette[i];
         // Lift the valley without flattening the terrain or the cottage's warm light.
-        const uint16_t color = kit::rgb(((original >> 11) * 8) + 26,
-                                      (((original >> 5) & 63) * 4) + 29,
-                                      ((original & 31) * 8) + 32);
+        const uint16_t color = kit::rgb(((original >> 11) * 8) + 33,
+                                      (((original >> 5) & 63) * 4) + 40,
+                                      ((original & 31) * 8) + 43);
         const int blue_bias = (original & 31) - (original >> 11);
         const float distance = kit::clampf((blue_bias - 5) * 0.10f, 0.0f, 1.0f);
         const uint16_t shaded = kit::mix(color, mist, haze * distance);
-        const uint16_t dusk = kit::mix(shaded, deep, dark * 0.08f);
-        valley[i] = kit::mix(dusk, white, flash * 0.38f);
+        const uint16_t dusk = kit::mix(shaded, deep, dark * 0.04f);
+        valley[i] = kit::mix(dusk, white, flash * 0.13f);
     }
     c.backdrop(kValley, valley);
     if (bright > 9000u) blit_dither(c, kArt_rainbow, ps, 0, 0, kit::clampi((int)((bright - 9000u) / 90u), 0, 16));
@@ -185,15 +184,30 @@ void draw(State *st)
     const bool blowing = !shocked && !fuming && windv > 0.42f;
     const bool angry = fuming || (!shocked && !blowing && dark > 0.62f);
     const bool worried = !shocked && !blowing && !angry && dark > 0.2f;
-    const int bob = (int)(2.2f * resona_sinf((float)(ms % 5600u) * (6.2832f / 5600.0f)));
-    const int shake = (fuming || (angry && dark > 0.85f)) ? (int)((ms / 60u) & 1u) * 2 - 1 : 0;
-    const int cx = kCloudX + shake, cy = kCloudY + bob - (shocked && ts < 200u ? 3 : 0);
+    const int bob = (int)((2.0f + 3.4f * st->storm) * resona_sinf((float)(ms % 5600u) * (6.2832f / 5600.0f)));
+    const float drift = windv * 6.0f * resona_sinf((float)(ms % 3800u) * (6.2832f / 3800.0f));
+    const float recoil = ts < 260u ? 5.0f * (1.0f - ts / 260.0f) : 0.0f;
+    const int cx = kCloudX + (int)drift, cy = kCloudY + bob - (int)recoil;
     uint16_t cloud[sizeof kCloudPalette / sizeof kCloudPalette[0]];
     for (unsigned i = 0; i < sizeof kCloudPalette / sizeof kCloudPalette[0]; ++i) {
-        const uint16_t tone = kit::mix(kCloudPalette[i], deep, dc * 0.70f);
+        const uint16_t base = kCloudPalette[i];
+        const uint16_t raised = kit::rgb((base >> 11) * 8 + 20,
+                                      ((base >> 5) & 63) * 4 + 25,
+                                      (base & 31) * 8 + 32);
+        const uint16_t tone = kit::mix(raised, deep, dc * 0.34f);
         cloud[i] = kit::mix(tone, white, flash * 0.52f);
     }
-    c.blit(kFeltCloud, cloud, cx, cy);
+    for (int y = 0; y < kFeltCloud.h; ++y) {
+        const int screen_y = cy + kFeltCloud.oy + y;
+        if (screen_y < 0 || screen_y >= c.H) continue;
+        const uint8_t *row = kFeltCloud.px + y * kFeltCloud.w;
+        uint16_t *dst = c.px + screen_y * c.stride + cx + kFeltCloud.ox;
+        for (int x = 0; x < kFeltCloud.w; ++x) {
+            if (!row[x]) continue;
+            const bool edge = x == 0 || x == kFeltCloud.w - 1 || !row[x - 1] || !row[x + 1];
+            dst[x] = edge ? kit::mix(dst[x], cloud[row[x]], .72f) : cloud[row[x]];
+        }
+    }
     st->pal_c[kArtFeature] = cream;
     const int fx = cx, fy = cy + 4;
     const uint32_t since_blink = ms - st->blink_at;
@@ -218,12 +232,12 @@ void draw(State *st)
     if ((st->s.thunder || st->gust) && ts > 900u) c.blit(kArt_bolt_small, pc, cx + 52 + (int)((ms / 180u) & 1u), cy + 22 + (int)((ms / 420u) & 1u));
 
     // Draw a soft fringe and a sharp branching core over the valley.
-    if (ts < 90u || (ts >= 130u && ts < 300u)) {
+    if (flash > .04f) {
         const int x = kit::clampi(st->strike_x, 24, 290);
         const int side = st->strike_flip ? -1 : 1;
         const int y = cy + 25;
-        const uint16_t fringe = kit::rgb(106, 134, 213);
-        const uint16_t core = kit::rgb(214, 228, 255);
+        const uint16_t fringe = kit::mix(kit::rgb(77, 106, 159), kit::rgb(155, 181, 246), flash);
+        const uint16_t core = kit::mix(kit::rgb(140, 165, 222), white, flash);
         c.thick(x, y, x - 13 * side, y + 24, 3, fringe);
         c.thick(x - 13 * side, y + 24, x + 2 * side, y + 20, 3, fringe);
         c.thick(x + 2 * side, y + 20, x - 21 * side, y + 58, 3, fringe);
@@ -231,6 +245,8 @@ void draw(State *st)
         c.line(x - 13 * side, y + 24, x + 2 * side, y + 20, core);
         c.line(x + 2 * side, y + 20, x - 21 * side, y + 58, core);
         c.line(x - 5 * side, y + 32, x + 12 * side, y + 42, fringe);
+        c.line(x + 12 * side, y + 42, x + 17 * side, y + 53, fringe);
+        c.line(x - 15 * side, y + 48, x - 30 * side, y + 53, fringe);
     }
 
     static const kit::Sprite *const kGauge[6] = {&kArt_gauge_0, &kArt_gauge_1, &kArt_gauge_2, &kArt_gauge_3, &kArt_gauge_4, &kArt_gauge_5};
@@ -278,18 +294,18 @@ void draw(State *st)
 
     // rain: a drizzle under the cloud, then the whole sky once the storm front is in
     const uint16_t drop_hi = kit::mix(kit::rgb(196, 218, 255), white, flash), drop_lo = kit::mix(kit::rgb(120, 158, 224), white, flash);
-    const int drops = (int)(rainv * 170.0f);
-    const bool front = dark > 0.5f;
+    const int drops = (int)(rainv * 145.0f);
+    const int far_fraction = (int)(kit::clampf((dark - .22f) * 2.3f, 0, 1) * 255);
     const float slant = 0.08f + 0.5f * windv;
     for (int k = 0; k < drops; ++k) {
         const uint32_t h = hash((uint32_t)k * 2654435761u + 77u);
         const bool wide = (k & 1) != 0;                        // every other drop belongs to the storm front
-        if (wide && !front) continue;
-        const int top = wide ? 14 : kCloudY + 26;
-        const int x0 = wide ? (int)(h % 380u) - 60 : kCloudX - 66 + (int)(h % 132u);
+        if (wide && (int)((h >> 24) & 255u) >= far_fraction) continue;
+        const int top = wide ? 14 : cy + 27;
+        const int x0 = wide ? (int)(h % 380u) - 60 : cx - 66 + (int)(h % 132u);
         const int depth = (int)((h >> 9) % 34u);
         const int span = 150 - top + depth;
-        const uint32_t speed = 210u + ((h >> 16) % 90u);      // px per second
+        const uint32_t speed = (wide ? 120u : 210u) + ((h >> 16) % 85u);      // px per second
         const int fall = (int)((ms * speed / 1000u + (h >> 4)) % (uint32_t)span);
         const int y = top + fall;
         const int x = x0 + (int)((float)fall * slant);
@@ -299,10 +315,14 @@ void draw(State *st)
             if (y < ground + 4) { c.put(x - 2, ground - 1, drop_hi); c.put(x + 2, ground - 1, drop_hi); c.put(x, ground, drop_lo); }
             continue;
         }
-        const int length = 4 + (int)((h >> 20) % 7u);
-        const uint16_t trail = kit::mix(drop_lo, deep, wide ? 0.48f : 0.28f);
-        for (int j = 0; j < length; ++j)
-            c.put(x - (int)((float)j * slant), y - j, j < 2 ? drop_hi : (j < 5 ? drop_lo : trail));
+        const int length = wide ? 3 + (int)((h >> 20) % 4u) : 6 + (int)((h >> 20) % 7u);
+        for (int j = 0; j < length; ++j) {
+            const int rx = x - (int)((float)j * slant), ry = y - j;
+            if (ry < top || rx < 0 || rx >= c.W || ry >= c.H) continue;
+            uint16_t &pixel = c.px[ry * c.stride + rx];
+            const float strength = (wide ? .30f : .86f) * (1.0f - (float)j / length);
+            pixel = kit::mix(pixel, drop_hi, strength);
+        }
     }
 
     // a knob's value shows for a moment after it is turned, by the thing it changes
@@ -313,7 +333,9 @@ void draw(State *st)
         else c.text_s(206 - c.text_w(1, kSpaceName[st->s.space]) / 2, 104, 1, cream, ink, kSpaceName[st->s.space]);
     }
 
+#if !defined(RESONA_LAB_HOST)
     c.banner(kit::audio_message(st->audio, "INSTALL STORM VOICE IN LAB"), ink, kit::rgb(252, 236, 150));
+#endif
     if (intro < 1.0f) {
         for (int y = 0; y < c.H; ++y) {
             uint16_t *row = c.px + y * c.stride;
@@ -343,6 +365,8 @@ int init(void *state, const resona_platform *platform)
     s.mix = kit::clampi(s.mix, 0, 100); s.level = kit::clampi(s.level, -12, 6);
     bind(st);
     st->seed = 0x57E47u;
+    st->blink_at = 0u - 1000u;
+    st->next_blink = 3100u;
     st->rain_at = st->wind_at = st->space_at = kNever;
     push(st);
     return 0;
@@ -427,8 +451,14 @@ void frame(void *state, uint32_t ms)
     const float falling = rain ? (st->storm > tease ? st->storm : tease) * (0.2f + 0.8f * rain_set) : 0.0f;
     st->wet = kit::clampf(st->wet + (falling > 0.05f ? falling * dt / 5000.0f : -dt / 14000.0f), 0.0f, 1.0f);
 
-    if (st->ms - st->blink_at > 2600u + (rnd(st) % 3000u)) st->blink_at = st->ms;
-    draw(st);
+    if ((int32_t)(st->ms - st->next_blink) >= 0) {
+        st->blink_at = st->ms;
+        st->next_blink = st->ms + 2600u + rnd(st) % 3000u;
+    }
+    if ((int32_t)(st->ms - st->next_draw) >= 0) {
+        st->next_draw = st->ms + 30u;
+        draw(st);
+    }
 }
 
 const resona_app kApp = {

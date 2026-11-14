@@ -1,4 +1,4 @@
-# Storm Cloud 1.1.5
+# Storm Cloud 1.1.6
 
 演奏动态驱动雨、风、雷和空间混响。
 
